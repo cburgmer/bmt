@@ -86,7 +86,7 @@ def dump_header(data: bytes, length: int = 64) -> None:
         u16_le = lambda i: struct.unpack_from("<H", data, i)[0]
         print(f"  @ 0x04  u32 LE: {u32_le(4)}")
         print(f"  @ 0x08  u32 LE: {u32_le(8)}")
-        print(f"  @ 0x0A  u32 LE: {u32_le(10)}  (likely header size = 54)")
+        print(f"  @ 0x0A  u32 LE: {u32_le(10)}  (header size, often 36)")
         print(f"  @ 0x0E  u32 LE: {u32_le(14)}  (sub-header size? = 40)")
         print(f"  @ 0x12  u32 LE: {u32_le(18)}  <- width")
         print(f"  @ 0x16  u32 LE: {u32_le(22)}  <- height")
@@ -125,27 +125,27 @@ def main() -> None:
 
     print(f"Total candidates: {len(candidates)}")
 
-    # High-confidence: same header pattern as at 0x0C (54, 40, then width, height)
+    # High-confidence: same header pattern (36, 40, then width, height)
     high_conf = [
         c for c in candidates
         if c[1] == "32-bit LE"
         and len(c[4]) >= 12
-        and c[4][:4] == b"\x36\x00\x00\x00"
-        and c[4][4:8] == b"\x28\x00\x00\x00"
+        and c[4][:4] == b"\x24\x00\x00\x00"  # 36 LE
+        and c[4][4:8] == b"\x28\x00\x00\x00"  # 40 LE
     ]
     if high_conf:
         print()
-        print("--- High-confidence dimension headers (pattern: 54, 40, width, height) ---")
+        print("--- High-confidence dimension headers (pattern: 36, 40, width, height) ---")
         for offset, enc, w, h, _ in high_conf:
             print(f"  offset 0x{offset:06x}:  {w} x {h}")
 
     # Sanity: expected pixel size for 320x240 @ 16 bpp
-    header_len = 54
+    header_len = 36
     ir_pixels = 320 * 240 * 2
     first_block_end = header_len + ir_pixels
     if first_block_end <= size:
         print()
-        print("--- Consistency check (first image 320x240 @ 16 bpp, header 54) ---")
+        print("--- Consistency check (first image 320x240 @ 16 bpp, header 36) ---")
         print(f"  Header + pixel block ends at offset: {first_block_end} (0x{first_block_end:x})")
         next_bytes = data[first_block_end : first_block_end + 32]
         print(f"  Next 32 bytes (hex): {next_bytes.hex()}")
