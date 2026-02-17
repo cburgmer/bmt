@@ -5,6 +5,7 @@ Extract the three potential images from a Testo BMT file and save as BMP.
 Based on reverse-engineered layout:
 - Image 1 (320x240): 54-byte header, then 16-bit LE pixel data (thermal/SuperResolution).
 - Image 2 (640x480): same 54-byte header at 153740, then 16-bit LE pixel data (visual).
+  Visual data starts 9 pixels (18 bytes) after the header to avoid non-image pixels at top-right.
 - Image 3 (160x120): 160,120 found at 768293 (16-bit LE); data assumed to start
   immediately after the 4-byte dimension (768297) — no standard header in context.
 
@@ -18,12 +19,16 @@ import sys
 from pathlib import Path
 
 # Header size used for first two images (BMP-like block header)
-BMT_HEADER_SIZE = 54
+BMT_HEADER_SIZE = 36
 
 # (label, file_offset, width, height, data_offset_override, "thermal" | "visual")
+# Visual: header at 153740 + 36
+VISUAL_HEADER_OFFSET = 153740
+
 IMAGE_SPECS = [
     ("thermal_320x240", 0, 320, 240, None, "thermal"),
-    ("visual_640x480", 153740, 640, 480, None, "visual"),
+    ("visual_640x480", VISUAL_HEADER_OFFSET, 640, 480, VISUAL_HEADER_OFFSET + BMT_HEADER_SIZE, "visual"),
+    ("thermal_160x120", 768293, 160, 120, 768297, "thermal"),
 ]
 
 
