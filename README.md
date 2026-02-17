@@ -66,6 +66,16 @@ python3 bmt_scan_dimensions.py path/to/image.BMT
 
 Prints a hex dump of the header and all candidate offsets where known resolutions (160×120, 320×240, 640×480) appear.
 
+### Scan for thermal scale (optional)
+
+To find where min/max temperature (thermal scale) might be stored for each picture:
+
+```bash
+python3 bmt_scan_thermal_scale.py path/to/image.BMT
+```
+
+Scans header and metadata regions for plausible temperature values (float, double, int16 °C or ×0.1, uint16 −273) and reports (min, max) pairs. A short summary lists the best candidates (e.g. for later use in the extractor).
+
 ## File layout (reverse‑engineered)
 
 - **First block:** BMA header (54 bytes) then 320×240 16‑bit thermal pixels.
