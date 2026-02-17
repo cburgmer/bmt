@@ -93,23 +93,6 @@
       width: 120px;
       accent-color: #0d6efd;
     }
-    .correction-readout {
-      margin-top: 0.5rem;
-      padding: 0.5rem;
-      background: #2a2a2a;
-      border-radius: 4px;
-      font-size: 0.85rem;
-    }
-    .correction-readout label {
-      display: block;
-      margin-bottom: 0.25rem;
-    }
-    .correction-readout code {
-      display: block;
-      word-break: break-all;
-      user-select: all;
-      color: #9cf;
-    }
     #content {
       display: flex;
       flex-direction: column;
@@ -225,10 +208,6 @@
         <input type="range" id="offsetY" min="-150" max="150" value="53" />
         <span id="offsetY-value">0</span>
       </span>
-      <div class="correction-readout">
-        <label>Correction (copy into script as default):</label>
-        <code id="correction-readout">scale=1.0, offset_x_px=0, offset_y_px=0</code>
-      </div>
     </div>
   </header>
   <div id="error" class="error" style="display: none;"></div>
@@ -365,7 +344,6 @@
         const offsetXValue = document.getElementById('offsetX-value');
         const offsetYSlider = document.getElementById('offsetY');
         const offsetYValue = document.getElementById('offsetY-value');
-        const correctionReadout = document.getElementById('correction-readout');
 
         function getScale() { return parseInt(scaleSlider.value, 10) / 100; }
         function getOffsetX() { return parseInt(offsetXSlider.value, 10); }
@@ -380,7 +358,6 @@
           scaleValue.textContent = scale.toFixed(2);
           offsetXValue.textContent = ox;
           offsetYValue.textContent = oy;
-          correctionReadout.textContent = 'scale=' + scale.toFixed(3) + ', offset_x_px=' + ox + ', offset_y_px=' + oy;
         }
         scaleSlider.addEventListener('input', applyThermalAlignment);
         offsetXSlider.addEventListener('input', applyThermalAlignment);
