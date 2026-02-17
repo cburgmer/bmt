@@ -76,6 +76,16 @@ python3 bmt_scan_thermal_scale.py path/to/image.BMT
 
 Scans header and metadata regions for plausible temperature values (float, double, int16 °C or ×0.1, uint16 −273) and reports (min, max) pairs. A short summary lists the best candidates (e.g. for later use in the extractor).
 
+### Analyse header stability (optional)
+
+To see which bytes in non-picture areas are identical across files (stable) vs image-specific (changing):
+
+```bash
+python3 bmt_analyze_headers.py image1.BMT image2.BMT ...
+```
+
+Reports four ranges (file/thermal header, block between thermal and visual, visual header, tail after visual image), with stable bytes printed escaped and changing bytes marked. Use this to see where per-image data (e.g. thermal scale) can live.
+
 ## File layout (reverse‑engineered)
 
 - **First block:** BMA header (54 bytes) then 320×240 16‑bit thermal pixels.
