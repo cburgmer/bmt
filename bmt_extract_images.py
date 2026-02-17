@@ -109,17 +109,15 @@ def load_temperatures_csv(csv_path: Path) -> dict[str, dict[str, float]]:
     return result
 
 
-def write_report(out_dir: Path, stems: list[str]) -> None:
-    """Write HTML report into out_dir. Single stem -> {stem}_report.html; multiple -> report.html."""
+def write_report(out_dir: Path, stems: list[str], input_source_dir: Path) -> None:
+    """Write HTML report into out_dir. Single stem -> {stem}_report.html; multiple -> report.html.
+    input_source_dir: directory where input BMT file(s) live; Temperatures.csv is read from there."""
     template = Path(__file__).parent / "bmt_report.html"
     if not template.exists():
         return
     html = template.read_text()
 
-    # Try Temperatures.csv next to script, then next to out_dir
-    csv_path = Path(__file__).parent / "Temperatures.csv"
-    if not csv_path.exists():
-        csv_path = out_dir / "Temperatures.csv"
+    csv_path = input_source_dir / "Temperatures.csv"
     temperatures = load_temperatures_csv(csv_path)
     html = html.replace(
         "/* __TEMPERATURES_JSON__ */ null",
@@ -167,13 +165,13 @@ def main() -> None:
             __import__("json").dumps(stems, indent=2),
             encoding="utf-8",
         )
-        write_report(out_dir, stems)
+        write_report(out_dir, stems, input_path)
     else:
         out_dir = out_dir_arg or input_path.parent / "extracted"
         print(f"Input: {input_path}")
         print(f"Output dir: {out_dir}")
         extract_images(input_path, out_dir)
-        write_report(out_dir, [input_path.stem])
+        write_report(out_dir, [input_path.stem], input_path.parent)
 
 
 if __name__ == "__main__":
