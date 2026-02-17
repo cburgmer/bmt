@@ -22,6 +22,8 @@ Based on reverse-engineered layout:
 Both images are extracted verbatim (no conversion).
 """
 
+import csv
+import json
 import struct
 import sys
 from pathlib import Path
@@ -84,18 +86,51 @@ def extract_images(bmt_path: Path, out_dir: Path) -> None:
         print(f"  {label}: (embedded BMP, {bmp_size} bytes) -> {out_path}")
 
 
+def load_temperatures_csv(csv_path: Path) -> dict[str, dict[str, float]]:
+    """Load Temperatures.csv (Focus/Min/Max per file). Returns dict keyed by stem: { focus, min, max }."""
+    result: dict[str, dict[str, float]] = {}
+    if not csv_path.exists():
+        return result
+    with open(csv_path, newline="", encoding="utf-8") as f:
+        for row in csv.reader(f, delimiter="\t"):
+            if len(row) < 5:
+                continue
+            try:
+                filename = row[0].strip()
+                if not filename or not filename.upper().endswith(".BMT"):
+                    continue
+                stem = Path(filename).stem
+                focus = float(row[2].replace(",", "."))
+                min_t = float(row[3].replace(",", "."))
+                max_t = float(row[4].replace(",", "."))
+                result[stem] = {"focus": focus, "min": min_t, "max": max_t}
+            except (ValueError, IndexError):
+                continue
+    return result
+
+
 def write_report(out_dir: Path, stems: list[str]) -> None:
     """Write HTML report into out_dir. Single stem -> {stem}_report.html; multiple -> report.html."""
     template = Path(__file__).parent / "bmt_report.html"
     if not template.exists():
         return
     html = template.read_text()
+
+    # Try Temperatures.csv next to script, then next to out_dir
+    csv_path = Path(__file__).parent / "Temperatures.csv"
+    if not csv_path.exists():
+        csv_path = out_dir / "Temperatures.csv"
+    temperatures = load_temperatures_csv(csv_path)
+    html = html.replace(
+        "/* __TEMPERATURES_JSON__ */ null",
+        "/* __TEMPERATURES_JSON__ */ " + json.dumps(temperatures),
+    )
+
     if len(stems) == 1:
         report_path = out_dir / f"{stems[0]}_report.html"
     else:
         report_path = out_dir / "report.html"
         # Embed stems so report can show all without fetching (stems.json still written for consistency)
-        import json
         html = html.replace(
             "/* __STEMS_JSON__ */ null",
             "/* __STEMS_JSON__ */ " + json.dumps(stems),

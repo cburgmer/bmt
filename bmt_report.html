@@ -137,6 +137,30 @@
       font-size: 0.85rem;
       color: #999;
     }
+    .img-wrap.thermal-wrap, .overlay-wrap {
+      position: relative;
+    }
+    .crosshair-overlay {
+      position: absolute;
+      left: 50%;
+      top: 50%;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.35rem;
+      font-size: 1rem;
+      color: #fff;
+      text-shadow: 0 0 2px #000, 0 0 4px #000, 0 1px 3px #000;
+      white-space: nowrap;
+    }
+    .crosshair-overlay .symbol { font-size: 1.25rem; }
+    .record h2 .temp-range {
+      font-weight: normal;
+      color: #999;
+      font-size: 0.9em;
+    }
     .overlay-view {
       display: none;
       width: 100%;
@@ -217,6 +241,7 @@
   <script>
     (function () {
       const STEMS_INLINE = /* __STEMS_JSON__ */ null;
+      const TEMPERATURES_INLINE = /* __TEMPERATURES_JSON__ */ null;
 
       const params = new URLSearchParams(location.search || '');
       const pathMatch = (window.location.pathname || '').match(/([^/]+)_report\.html$/);
@@ -247,19 +272,27 @@
       function buildSection(stem) {
         const thermalUrl = stem + '_thermal_320x240.bmp';
         const visualUrl = stem + '_visual_640x480.bmp';
+        const t = TEMPERATURES_INLINE && TEMPERATURES_INLINE[stem];
+        const tempRangeStr = t != null ? (t.min + ' … ' + t.max + ' °C') : '';
+        const crosshairHtml = t != null
+          ? '<div class="crosshair-overlay"><span class="symbol">⊹</span> ' + t.focus + ' °C</div>'
+          : '';
 
         const section = document.createElement('section');
         section.className = 'record';
         section.innerHTML =
-          '<h2>' + stem + '</h2>' +
+          '<h2>' + stem + (tempRangeStr ? ' <span class="temp-range">(' + tempRangeStr + ')</span>' : '') + '</h2>' +
           '<div class="sidebyside-view">' +
-            '<div class="img-wrap"><img class="sb-thermal" alt="Thermal" /><span>Thermal (320×240)</span></div>' +
+            '<div class="img-wrap thermal-wrap">' +
+              '<img class="sb-thermal" alt="Thermal" />' + crosshairHtml +
+              '<span>Thermal (320×240)</span></div>' +
             '<div class="img-wrap"><img class="sb-visual" alt="Visual" /><span>Visual (640×480)</span></div>' +
           '</div>' +
           '<div class="overlay-view">' +
             '<div class="overlay-wrap">' +
               '<img class="base ov-visual" alt="Visual" />' +
               '<img class="thermal-layer ov-thermal" alt="Thermal overlay" />' +
+              crosshairHtml +
             '</div>' +
           '</div>';
 
