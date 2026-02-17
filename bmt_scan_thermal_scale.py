@@ -182,14 +182,26 @@ def find_min_max_pairs(data: bytes, start: int, end: int) -> list[tuple[int, str
 SUMMARY_TEMP_MIN = -10.0
 SUMMARY_TEMP_MAX = 60.0
 SUMMARY_MIN_SPREAD = 10.0  # min–max spread to count as scale (avoid text/accidental pairs)
+TARGET_MIN_C = -6.0
+TARGET_MAX_C = 50.0
+
+
+def _distance_to_target(lo: float, hi: float) -> float:
+    """Distance of (lo, hi) from target range (-6, 50). Lower is better."""
+    return abs(lo - TARGET_MIN_C) + abs(hi - TARGET_MAX_C)
 
 
 def main() -> None:
     paths = [Path(p) for p in sys.argv[1:]] if len(sys.argv) > 1 else [Path("IV_01279.BMT")]
+    paths = [p for p in paths if p.exists()]
+    if not paths:
+        print("No files found.", file=sys.stderr)
+        return
+
+    # Across all files: (region, offset, enc) -> list of (lo, hi)
+    aggregated: dict[tuple[str, int, str], list[tuple[float, float]]] = {}
+
     for bmt_path in paths:
-        if not bmt_path.exists():
-            print(f"Skip (not found): {bmt_path}", file=sys.stderr)
-            continue
         data = bmt_path.read_bytes()
         print(f"\n{'='*60}")
         print(f"File: {bmt_path}  ({len(data)} bytes)")
@@ -200,17 +212,17 @@ def main() -> None:
         for name, start, end in SCAN_REGIONS:
             print(f"\n--- Region: {name}  (0x{start:x} – 0x{end:x}, {end - start} bytes) ---")
             candidates = scan_region(data, name, start, end)
-            # (min, max) pairs first — most useful for thermal scale
             pairs = find_min_max_pairs(data, start, end)
-            for p in pairs:
-                all_pairs.append((name,) + p)
+            for off, enc, lo, hi in pairs:
+                all_pairs.append((name, off, enc, lo, hi))
+                key = (name, off, enc)
+                aggregated.setdefault(key, []).append((lo, hi))
             if pairs:
                 print("  Possible thermal scale (min °C, max °C) pairs:")
                 for off, enc, lo, hi in pairs:
                     hex_snip = data[off : off + 16].hex() if off + 16 <= len(data) else data[off:].hex()
                     print(f"    0x{off:05x}  {enc}  →  min={lo:.2f}, max={hi:.2f} °C   ({hex_snip})")
 
-            # Single-value candidates: exclude 0.0, sort by offset, dedupe
             single_seen = set()
             for off, enc, val in sorted(candidates, key=lambda x: (x[0], x[2])):
                 if val == 0.0:
@@ -225,19 +237,42 @@ def main() -> None:
             if not pairs and not single_seen:
                 print("  No plausible thermal scale (min/max pairs or non-zero single values) in range [{}, {}] °C.".format(TEMP_MIN, TEMP_MAX))
 
-        # Summary: best candidates for thermal scale (both in expected range, good spread)
-        summary = [
-            (region, off, enc, lo, hi)
-            for region, off, enc, lo, hi in all_pairs
-            if SUMMARY_TEMP_MIN <= lo <= SUMMARY_TEMP_MAX
-            and SUMMARY_TEMP_MIN <= hi <= SUMMARY_TEMP_MAX
-            and (hi - lo) >= SUMMARY_MIN_SPREAD
-        ]
-        if summary:
-            print("\n--- Best thermal scale candidates (min/max in [{}, {}] °C, spread ≥ {} °C) ---".format(
-                SUMMARY_TEMP_MIN, SUMMARY_TEMP_MAX, SUMMARY_MIN_SPREAD))
-            for region, off, enc, lo, hi in summary:
-                print(f"  {region}  0x{off:05x}  {enc}  →  min={lo:.2f}, max={hi:.2f} °C")
+        # Per-file summary (when a single file)
+        if len(paths) == 1:
+            summary = [
+                (region, off, enc, lo, hi)
+                for region, off, enc, lo, hi in all_pairs
+                if SUMMARY_TEMP_MIN <= lo <= SUMMARY_TEMP_MAX
+                and SUMMARY_TEMP_MIN <= hi <= SUMMARY_TEMP_MAX
+                and (hi - lo) >= SUMMARY_MIN_SPREAD
+            ]
+            if summary:
+                print("\n--- Best thermal scale candidates (min/max in [{}, {}] °C, spread ≥ {} °C) ---".format(
+                    SUMMARY_TEMP_MIN, SUMMARY_TEMP_MAX, SUMMARY_MIN_SPREAD))
+                for region, off, enc, lo, hi in summary:
+                    print(f"  {region}  0x{off:05x}  {enc}  →  min={lo:.2f}, max={hi:.2f} °C")
+
+    # Multi-file: aggregate min/max per candidate and sort by distance to (-6, 50)
+    if len(paths) > 1 and aggregated:
+        # For each candidate: global_lo = min of all lo, global_hi = max of all hi
+        summary_agg = []
+        for (region, off, enc), pairs in aggregated.items():
+            los, his = [p[0] for p in pairs], [p[1] for p in pairs]
+            global_lo, global_hi = min(los), max(his)
+            if not (SUMMARY_TEMP_MIN <= global_lo <= SUMMARY_TEMP_MAX and SUMMARY_TEMP_MIN <= global_hi <= SUMMARY_TEMP_MAX):
+                continue
+            if global_hi - global_lo < SUMMARY_MIN_SPREAD:
+                continue
+            dist = _distance_to_target(global_lo, global_hi)
+            summary_agg.append((dist, region, off, enc, global_lo, global_hi, len(pairs)))
+        summary_agg.sort(key=lambda x: (x[0], x[1], x[2]))
+        print("\n" + "=" * 60)
+        print("Aggregated across {} file(s): min/max per candidate, ordered by distance to target ({} to {} °C)".format(
+            len(paths), TARGET_MIN_C, TARGET_MAX_C))
+        print("=" * 60)
+        for dist, region, off, enc, global_lo, global_hi, n in summary_agg:
+            print(f"  {region}  0x{off:05x}  {enc}")
+            print(f"    →  min={global_lo:.2f}, max={global_hi:.2f} °C  (over {n} file(s))  distance to ({TARGET_MIN_C}, {TARGET_MAX_C})= {dist:.1f}")
 
     print()
 
