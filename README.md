@@ -74,4 +74,4 @@ Prints a hex dump of the header and all candidate offsets where known resolution
 
 ## License
 
-Use and modify as you like; the BMT layout is reverse‑engineered and unofficial.
+This project is licensed under the **Apache License, Version 2.0**. See [LICENSE](LICENSE) for the full text. The BMT file layout described here is reverse‑engineered and unofficial.
