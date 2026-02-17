@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BMT thermal + visual report</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      margin: 0;
+      padding: 1rem;
+      background: #1a1a1a;
+      color: #e0e0e0;
+      min-height: 100vh;
+    }
+    h1 {
+      font-size: 1.25rem;
+      font-weight: 600;
+      margin: 0 0 1rem 0;
+    }
+    .toolbar {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
+    }
+    .mode-btn {
+      padding: 0.5rem 1rem;
+      border: 1px solid #444;
+      border-radius: 6px;
+      background: #2a2a2a;
+      color: #e0e0e0;
+      cursor: pointer;
+      font-size: 0.9rem;
+    }
+    .mode-btn:hover {
+      background: #333;
+    }
+    .mode-btn.active {
+      background: #0d6efd;
+      border-color: #0d6efd;
+      color: #fff;
+    }
+    .view {
+      display: none;
+      width: 100%;
+    }
+    .view.active {
+      display: block;
+    }
+    .side-by-side {
+      display: flex;
+      gap: 1rem;
+      justify-content: center;
+      align-items: flex-start;
+      flex-wrap: wrap;
+    }
+    .side-by-side .img-wrap {
+      flex: 0 0 auto;
+      text-align: center;
+    }
+    .side-by-side .img-wrap img {
+      display: block;
+      height: 480px;
+      width: auto;
+      max-width: 100%;
+      object-fit: contain;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+    .side-by-side .img-wrap span {
+      display: block;
+      margin-top: 0.5rem;
+      font-size: 0.85rem;
+      color: #999;
+    }
+    .overlay-wrap {
+      position: relative;
+      display: inline-block;
+      max-width: 100%;
+      line-height: 0;
+    }
+    .overlay-wrap .base {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      border-radius: 8px;
+      box-shadow: 0 2px 12px rgba(0,0,0,0.4);
+    }
+    .overlay-wrap .thermal-layer {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      pointer-events: none;
+      border-radius: 8px;
+      transition: opacity 0.15s ease;
+    }
+    .overlay-controls {
+      margin-top: 0.75rem;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .overlay-controls label {
+      font-size: 0.9rem;
+      color: #999;
+    }
+    .overlay-controls input[type="range"] {
+      width: 120px;
+      accent-color: #0d6efd;
+    }
+    .error {
+      color: #f66;
+      padding: 1rem;
+    }
+    .loading {
+      color: #999;
+      padding: 1rem;
+    }
+  </style>
+</head>
+<body>
+  <h1 id="title">Thermal + visual</h1>
+  <div class="toolbar">
+    <button type="button" class="mode-btn active" data-mode="sidebyside">Side by side</button>
+    <button type="button" class="mode-btn" data-mode="overlay">Thermal over visual (alpha)</button>
+  </div>
+  <div id="error" class="error" style="display: none;"></div>
+  <div id="loading" class="loading" style="display: none;">Loading images…</div>
+  <div id="view-sidebyside" class="view side-by-side">
+    <div class="img-wrap">
+      <img id="img-thermal" alt="Thermal" src="" />
+      <span>Thermal (320×240)</span>
+    </div>
+    <div class="img-wrap">
+      <img id="img-visual" alt="Visual" src="" />
+      <span>Visual (640×480)</span>
+    </div>
+  </div>
+  <div id="view-overlay" class="view overlay-view">
+    <div class="overlay-wrap" id="overlay-wrap">
+      <img id="overlay-visual" class="base" alt="Visual" src="" />
+      <img id="overlay-thermal" class="thermal-layer" alt="Thermal overlay" src="" />
+    </div>
+    <div class="overlay-controls">
+      <label for="alpha">Thermal opacity:</label>
+      <input type="range" id="alpha" min="0" max="100" value="60" />
+      <span id="alpha-value">60%</span>
+    </div>
+  </div>
+
+  <script>
+    (function () {
+      const params = new URLSearchParams(location.search || '');
+      const pathMatch = (window.location.pathname || '').match(/([^/]+)_report\.html$/);
+      const stem = params.get('stem') || (pathMatch ? pathMatch[1] : null) || 'IV_01279';
+      const thermalUrl = stem + '_thermal_320x240.bmp';
+      const visualUrl = stem + '_visual_640x480.bmp';
+
+      document.getElementById('title').textContent = 'BMT: ' + stem + ' — Thermal + visual';
+
+      const imgThermal = document.getElementById('img-thermal');
+      const imgVisual = document.getElementById('img-visual');
+      const overlayVisual = document.getElementById('overlay-visual');
+      const overlayThermal = document.getElementById('overlay-thermal');
+      const errorEl = document.getElementById('error');
+      const loadingEl = document.getElementById('loading');
+      const views = {
+        sidebyside: document.getElementById('view-sidebyside'),
+        overlay: document.getElementById('view-overlay')
+      };
+      const modeBtns = document.querySelectorAll('.mode-btn');
+
+      function showError(msg) {
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'block';
+        errorEl.textContent = msg;
+        views.sidebyside.classList.remove('active');
+        views.overlay.classList.remove('active');
+      }
+
+      function setSources() {
+        imgThermal.src = thermalUrl;
+        imgVisual.src = visualUrl;
+        overlayVisual.src = visualUrl;
+        overlayThermal.src = thermalUrl;
+      }
+
+      function switchMode(mode) {
+        modeBtns.forEach(function (btn) {
+          btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
+        });
+        Object.keys(views).forEach(function (m) {
+          views[m].classList.toggle('active', m === mode);
+        });
+      }
+
+      loadingEl.style.display = 'block';
+      setSources();
+
+      Promise.all([
+        new Promise(function (resolve, reject) {
+          imgThermal.onload = resolve;
+          imgThermal.onerror = function () { reject(new Error('Failed to load thermal image')); };
+        }),
+        new Promise(function (resolve, reject) {
+          imgVisual.onload = resolve;
+          imgVisual.onerror = function () { reject(new Error('Failed to load visual image')); };
+        })
+      ]).then(function () {
+        loadingEl.style.display = 'none';
+        errorEl.style.display = 'none';
+        switchMode('sidebyside');
+      }).catch(function (err) {
+        showError(err.message + ' — Ensure the report is in the same folder as ' + thermalUrl + ' and ' + visualUrl + ', or use ?stem=XXX');
+      });
+
+      modeBtns.forEach(function (btn) {
+        btn.addEventListener('click', function () {
+          switchMode(btn.getAttribute('data-mode'));
+        });
+      });
+
+      var alphaSlider = document.getElementById('alpha');
+      var alphaValue = document.getElementById('alpha-value');
+      alphaSlider.addEventListener('input', function () {
+        var pct = alphaSlider.value;
+        overlayThermal.style.opacity = pct / 100;
+        alphaValue.textContent = pct + '%';
+      });
+      overlayThermal.style.opacity = alphaSlider.value / 100;
+    })();
+  </script>
+</body>
+</html>

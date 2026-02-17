@@ -189,6 +189,16 @@ def extract_images(bmt_path: Path, out_dir: Path) -> None:
         print(f"  {label}: {width}x{height} -> {out_path}")
 
 
+def write_report(out_dir: Path, stem: str) -> None:
+    """Write HTML report into out_dir as {stem}_report.html (uses images in same folder)."""
+    template = Path(__file__).parent / "bmt_report.html"
+    if not template.exists():
+        return
+    report_path = out_dir / f"{stem}_report.html"
+    report_path.write_bytes(template.read_bytes())
+    print(f"  Report: {report_path}")
+
+
 def main() -> None:
     bmt_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("IV_01279.BMT")
     out_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else bmt_path.parent / "extracted"
@@ -200,6 +210,7 @@ def main() -> None:
     print(f"Input: {bmt_path}")
     print(f"Output dir: {out_dir}")
     extract_images(bmt_path, out_dir)
+    write_report(out_dir, bmt_path.stem)
 
 
 if __name__ == "__main__":
