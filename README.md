@@ -10,6 +10,10 @@ Use this if you have `.BMT` files but no Windows/Proprietary software to open th
 - **Optional:** Scans a BMT file for potential image-dimension headers (for reverse‑engineering).
 - **HTML report:** View thermal and visual side‑by‑side or with thermal overlaid on the photo (opacity slider). Supports a single file or a directory of BMTs (all listed, sorted by filename).
 
+## Limitations:
+
+This project was tried without the SuperResolution option turned on. This option will probably change the file format. 
+
 ## Requirements
 
 - **Python 3** (no extra packages; uses only the standard library).
