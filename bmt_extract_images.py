@@ -32,8 +32,8 @@ VISUAL_BMP_OFFSET = 0x2587A
 
 # (label, bmp_offset, width, height) for display only
 IMAGE_SPECS = [
-    ("thermal_320x240", THERMAL_BMP_OFFSET, 320, 240),
-    ("visual_640x480", VISUAL_BMP_OFFSET, 640, 480),
+    ("thermal_320x240", THERMAL_BMP_OFFSET),
+    ("visual_640x480", VISUAL_BMP_OFFSET),
 ]
 
 
@@ -54,7 +54,7 @@ def extract_images(bmt_path: Path, out_dir: Path) -> None:
     data = bmt_path.read_bytes()
     out_dir.mkdir(parents=True, exist_ok=True)
 
-    for label, bmp_offset, width, height in IMAGE_SPECS:
+    for label, bmp_offset in IMAGE_SPECS:
         out_name = f"{bmt_path.stem}_{label}.bmp"
         out_path = out_dir / out_name
 
@@ -81,7 +81,7 @@ def extract_images(bmt_path: Path, out_dir: Path) -> None:
         chunk = bytearray(data[bmp_offset:end])
         struct.pack_into("<I", chunk, 2, bmp_size)
         out_path.write_bytes(chunk)
-        print(f"  {label}: {width}x{height} (embedded BMP, {bmp_size} bytes) -> {out_path}")
+        print(f"  {label}: (embedded BMP, {bmp_size} bytes) -> {out_path}")
 
 
 def write_report(out_dir: Path, stems: list[str]) -> None:
