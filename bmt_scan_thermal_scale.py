@@ -13,11 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Scan BMT file header regions for plausible thermal scale (temperature range) values.
+Scan BMT file for plausible thermal scale (temperature range) values.
 
 The camera auto-adjusts so the coldest pixel maps to dark blue and the warmest to
-white/red. We expect min and max temperature (e.g. -6°C to 50°C) stored somewhere in
-headers, possibly as float, double, or fixed-point (e.g. int16 with 0.1° scale).
+white/red. We expect min and max temperature (e.g. -6°C to 50°C) stored in
+image-specific (changing) regions identified by bmt_analyze_headers.py.
 
 Outputs candidates in plausible Celsius range so you can identify the right offsets
 and encoding (e.g. to copy into the extractor for proper temperature scaling).
@@ -27,18 +27,13 @@ import struct
 import sys
 from pathlib import Path
 
-# Known layout (from bmt_extract_images)
-THERMAL_HEADER_SIZE = 54
-THERMAL_PIXEL_BYTES = 320 * 240 * 2
-FIRST_BLOCK_END = THERMAL_HEADER_SIZE + THERMAL_PIXEL_BYTES  # 153654
-VISUAL_HEADER_OFFSET = 153740
-VISUAL_HEADER_SIZE = 36
-
-# Regions to scan: (name, start, end)
+# Intervals to scan: (name, start, end) — based on changing regions from header analysis
 SCAN_REGIONS = [
-    ("thermal_header", 0, THERMAL_HEADER_SIZE),
-    ("after_thermal_block", FIRST_BLOCK_END, VISUAL_HEADER_OFFSET),  # metadata
-    ("visual_header", VISUAL_HEADER_OFFSET, VISUAL_HEADER_OFFSET + VISUAL_HEADER_SIZE),
+    ("0x2586a_0x2586f", 0x2586A, 0x2586F),
+    ("0xbb8cf_0xbb8d7", 0xBB8CF, 0xBB8D7),
+    ("0xbb8e7_0xbb8f7", 0xBB8E7, 0xBB8F7),
+    ("0xbb912_0xbb918", 0xBB912, 0xBB918),
+    ("0xbb929_0xbb938", 0xBB929, 0xBB938),
 ]
 
 # Plausible temperature range for reporting (Celsius)
