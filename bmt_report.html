@@ -60,21 +60,45 @@
     }
     .overlay-controls {
       display: none;
-      align-items: center;
-      gap: 0.75rem;
+      flex-direction: column;
+      gap: 0.5rem;
       margin-bottom: 1rem;
-      flex-wrap: wrap;
+      max-width: 640px;
     }
     body[data-mode="overlay"] .overlay-controls {
       display: flex;
     }
+    .overlay-controls .control-row {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-wrap: wrap;
+    }
     .overlay-controls label {
       font-size: 0.9rem;
       color: #999;
+      min-width: 6rem;
     }
     .overlay-controls input[type="range"] {
       width: 120px;
       accent-color: #0d6efd;
+    }
+    .correction-readout {
+      margin-top: 0.5rem;
+      padding: 0.5rem;
+      background: #2a2a2a;
+      border-radius: 4px;
+      font-size: 0.85rem;
+    }
+    .correction-readout label {
+      display: block;
+      margin-bottom: 0.25rem;
+    }
+    .correction-readout code {
+      display: block;
+      word-break: break-all;
+      user-select: all;
+      color: #9cf;
     }
     #content {
       display: flex;
@@ -132,6 +156,7 @@
       display: inline-block;
       max-width: 100%;
       line-height: 0;
+      overflow: visible;
     }
     .overlay-wrap .base {
       display: block;
@@ -150,6 +175,7 @@
       pointer-events: none;
       border-radius: 8px;
       transition: opacity 0.15s ease;
+      transform-origin: 50% 50%;
     }
     .error {
       color: #f66;
@@ -168,9 +194,30 @@
     <button type="button" class="mode-btn" data-mode="overlay">Thermal over visual (alpha)</button>
   </div>
   <div class="overlay-controls">
-    <label for="alpha">Thermal opacity (all):</label>
-    <input type="range" id="alpha" min="0" max="100" value="60" />
-    <span id="alpha-value">60%</span>
+    <span class="control-row">
+      <label for="alpha">Opacity:</label>
+      <input type="range" id="alpha" min="0" max="100" value="60" />
+      <span id="alpha-value">60%</span>
+    </span>
+    <span class="control-row">
+      <label for="scale">Scale:</label>
+      <input type="range" id="scale" min="50" max="200" value="100" />
+      <span id="scale-value">1.00</span>
+    </span>
+    <span class="control-row">
+      <label for="offsetX">Offset X (px):</label>
+      <input type="range" id="offsetX" min="-150" max="150" value="0" />
+      <span id="offsetX-value">0</span>
+    </span>
+    <span class="control-row">
+      <label for="offsetY">Offset Y (px):</label>
+      <input type="range" id="offsetY" min="-150" max="150" value="0" />
+      <span id="offsetY-value">0</span>
+    </span>
+    <div class="correction-readout">
+      <label>Correction (copy into script as default):</label>
+      <code id="correction-readout">scale=1.0, offset_x_px=0, offset_y_px=0</code>
+    </div>
   </div>
   <div id="error" class="error" style="display: none;"></div>
   <div id="loading" class="loading" style="display: none;">Loading…</div>
@@ -299,6 +346,34 @@
           setOverlayOpacity(parseInt(alphaSlider.value, 10));
         });
         setOverlayOpacity(parseInt(alphaSlider.value, 10));
+
+        const scaleSlider = document.getElementById('scale');
+        const scaleValue = document.getElementById('scale-value');
+        const offsetXSlider = document.getElementById('offsetX');
+        const offsetXValue = document.getElementById('offsetX-value');
+        const offsetYSlider = document.getElementById('offsetY');
+        const offsetYValue = document.getElementById('offsetY-value');
+        const correctionReadout = document.getElementById('correction-readout');
+
+        function getScale() { return parseInt(scaleSlider.value, 10) / 100; }
+        function getOffsetX() { return parseInt(offsetXSlider.value, 10); }
+        function getOffsetY() { return parseInt(offsetYSlider.value, 10); }
+
+        function applyThermalAlignment() {
+          const scale = getScale();
+          const ox = getOffsetX();
+          const oy = getOffsetY();
+          const t = 'translate(' + ox + 'px,' + oy + 'px) scale(' + scale + ')';
+          thermalLayers.forEach(function (el) { el.style.transform = t; });
+          scaleValue.textContent = scale.toFixed(2);
+          offsetXValue.textContent = ox;
+          offsetYValue.textContent = oy;
+          correctionReadout.textContent = 'scale=' + scale.toFixed(3) + ', offset_x_px=' + ox + ', offset_y_px=' + oy;
+        }
+        scaleSlider.addEventListener('input', applyThermalAlignment);
+        offsetXSlider.addEventListener('input', applyThermalAlignment);
+        offsetYSlider.addEventListener('input', applyThermalAlignment);
+        applyThermalAlignment();
       }).catch(function (err) {
         showError(err.message);
       });
