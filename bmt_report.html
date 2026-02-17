@@ -43,27 +43,54 @@
       border-color: #0d6efd;
       color: #fff;
     }
-    .view {
+    .overlay-controls {
       display: none;
-      width: 100%;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 1rem;
+      flex-wrap: wrap;
     }
-    .view.active {
-      display: block;
-    }
-    .view.active.side-by-side {
+    body[data-mode="overlay"] .overlay-controls {
       display: flex;
     }
-    .side-by-side {
+    .overlay-controls label {
+      font-size: 0.9rem;
+      color: #999;
+    }
+    .overlay-controls input[type="range"] {
+      width: 120px;
+      accent-color: #0d6efd;
+    }
+    #content {
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+    .record {
+      width: 100%;
+    }
+    .record h2 {
+      font-size: 1rem;
+      font-weight: 600;
+      margin: 0 0 0.75rem 0;
+      color: #ccc;
+    }
+    .sidebyside-view {
+      display: none;
       gap: 1rem;
       justify-content: center;
       align-items: flex-start;
       flex-wrap: wrap;
+      width: 100%;
     }
-    .side-by-side .img-wrap {
+    body[data-mode="sidebyside"] .sidebyside-view {
+      display: flex;
+    }
+    .sidebyside-view .img-wrap {
       flex: 0 0 auto;
       text-align: center;
     }
-    .side-by-side .img-wrap img {
+    .sidebyside-view .img-wrap img {
       display: block;
       height: 480px;
       width: auto;
@@ -72,11 +99,18 @@
       border-radius: 8px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.4);
     }
-    .side-by-side .img-wrap span {
+    .sidebyside-view .img-wrap span {
       display: block;
       margin-top: 0.5rem;
       font-size: 0.85rem;
       color: #999;
+    }
+    .overlay-view {
+      display: none;
+      width: 100%;
+    }
+    body[data-mode="overlay"] .overlay-view {
+      display: block;
     }
     .overlay-wrap {
       position: relative;
@@ -102,21 +136,6 @@
       border-radius: 8px;
       transition: opacity 0.15s ease;
     }
-    .overlay-controls {
-      margin-top: 0.75rem;
-      display: flex;
-      align-items: center;
-      gap: 0.75rem;
-      flex-wrap: wrap;
-    }
-    .overlay-controls label {
-      font-size: 0.9rem;
-      color: #999;
-    }
-    .overlay-controls input[type="range"] {
-      width: 120px;
-      accent-color: #0d6efd;
-    }
     .error {
       color: #f66;
       padding: 1rem;
@@ -127,116 +146,147 @@
     }
   </style>
 </head>
-<body>
+<body data-mode="sidebyside">
   <h1 id="title">Thermal + visual</h1>
   <div class="toolbar">
     <button type="button" class="mode-btn active" data-mode="sidebyside">Side by side</button>
     <button type="button" class="mode-btn" data-mode="overlay">Thermal over visual (alpha)</button>
   </div>
+  <div class="overlay-controls">
+    <label for="alpha">Thermal opacity (all):</label>
+    <input type="range" id="alpha" min="0" max="100" value="60" />
+    <span id="alpha-value">60%</span>
+  </div>
   <div id="error" class="error" style="display: none;"></div>
-  <div id="loading" class="loading" style="display: none;">Loading images…</div>
-  <div id="view-sidebyside" class="view side-by-side">
-    <div class="img-wrap">
-      <img id="img-thermal" alt="Thermal" src="" />
-      <span>Thermal (320×240)</span>
-    </div>
-    <div class="img-wrap">
-      <img id="img-visual" alt="Visual" src="" />
-      <span>Visual (640×480)</span>
-    </div>
-  </div>
-  <div id="view-overlay" class="view overlay-view">
-    <div class="overlay-wrap" id="overlay-wrap">
-      <img id="overlay-visual" class="base" alt="Visual" src="" />
-      <img id="overlay-thermal" class="thermal-layer" alt="Thermal overlay" src="" />
-    </div>
-    <div class="overlay-controls">
-      <label for="alpha">Thermal opacity:</label>
-      <input type="range" id="alpha" min="0" max="100" value="60" />
-      <span id="alpha-value">60%</span>
-    </div>
-  </div>
+  <div id="loading" class="loading" style="display: none;">Loading…</div>
+  <div id="content"></div>
 
   <script>
     (function () {
+      const STEMS_INLINE = /* __STEMS_JSON__ */ null;
+
       const params = new URLSearchParams(location.search || '');
       const pathMatch = (window.location.pathname || '').match(/([^/]+)_report\.html$/);
-      const stem = params.get('stem') || (pathMatch ? pathMatch[1] : null) || 'IV_01279';
-      const thermalUrl = stem + '_thermal_320x240.bmp';
-      const visualUrl = stem + '_visual_640x480.bmp';
+      const stemFromUrl = params.get('stem') || (pathMatch ? pathMatch[1] : null) || 'IV_01279';
 
-      document.getElementById('title').textContent = 'BMT: ' + stem + ' — Thermal + visual';
-
-      const imgThermal = document.getElementById('img-thermal');
-      const imgVisual = document.getElementById('img-visual');
-      const overlayVisual = document.getElementById('overlay-visual');
-      const overlayThermal = document.getElementById('overlay-thermal');
       const errorEl = document.getElementById('error');
       const loadingEl = document.getElementById('loading');
-      const views = {
-        sidebyside: document.getElementById('view-sidebyside'),
-        overlay: document.getElementById('view-overlay')
-      };
-      const modeBtns = document.querySelectorAll('.mode-btn');
+      const contentEl = document.getElementById('content');
+      const titleEl = document.getElementById('title');
 
       function showError(msg) {
         loadingEl.style.display = 'none';
+        contentEl.innerHTML = '';
         errorEl.style.display = 'block';
         errorEl.textContent = msg;
-        views.sidebyside.classList.remove('active');
-        views.overlay.classList.remove('active');
       }
 
-      function setSources() {
-        imgThermal.src = thermalUrl;
-        imgVisual.src = visualUrl;
-        overlayVisual.src = visualUrl;
-        overlayThermal.src = thermalUrl;
+      function getStems() {
+        if (Array.isArray(STEMS_INLINE) && STEMS_INLINE.length > 0) {
+          return Promise.resolve(STEMS_INLINE);
+        }
+        return fetch('stems.json')
+          .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+          .then(function (arr) { return Array.isArray(arr) ? arr : [stemFromUrl]; })
+          .catch(function () { return [stemFromUrl]; });
+      }
+
+      function buildSection(stem) {
+        const thermalUrl = stem + '_thermal_320x240.bmp';
+        const visualUrl = stem + '_visual_640x480.bmp';
+
+        const section = document.createElement('section');
+        section.className = 'record';
+        section.innerHTML =
+          '<h2>' + stem + '</h2>' +
+          '<div class="sidebyside-view">' +
+            '<div class="img-wrap"><img class="sb-thermal" alt="Thermal" /><span>Thermal (320×240)</span></div>' +
+            '<div class="img-wrap"><img class="sb-visual" alt="Visual" /><span>Visual (640×480)</span></div>' +
+          '</div>' +
+          '<div class="overlay-view">' +
+            '<div class="overlay-wrap">' +
+              '<img class="base ov-visual" alt="Visual" />' +
+              '<img class="thermal-layer ov-thermal" alt="Thermal overlay" />' +
+            '</div>' +
+          '</div>';
+
+        const sbThermal = section.querySelector('.sb-thermal');
+        const sbVisual = section.querySelector('.sb-visual');
+        const ovVisual = section.querySelector('.ov-visual');
+        const ovThermal = section.querySelector('.ov-thermal');
+
+        sbThermal.src = ovThermal.src = thermalUrl;
+        sbVisual.src = ovVisual.src = visualUrl;
+
+        return { section: section, ovThermal: ovThermal };
       }
 
       function switchMode(mode) {
-        modeBtns.forEach(function (btn) {
+        document.body.setAttribute('data-mode', mode);
+        document.querySelectorAll('.mode-btn').forEach(function (btn) {
           btn.classList.toggle('active', btn.getAttribute('data-mode') === mode);
-        });
-        Object.keys(views).forEach(function (m) {
-          views[m].classList.toggle('active', m === mode);
         });
       }
 
-      loadingEl.style.display = 'block';
-      setSources();
+      getStems().then(function (stems) {
+        stems = stems.slice().sort();
+        titleEl.textContent = stems.length > 1
+          ? 'BMT report — ' + stems.length + ' pictures'
+          : 'BMT: ' + stems[0] + ' — Thermal + visual';
 
-      Promise.all([
-        new Promise(function (resolve, reject) {
-          imgThermal.onload = resolve;
-          imgThermal.onerror = function () { reject(new Error('Failed to load thermal image')); };
-        }),
-        new Promise(function (resolve, reject) {
-          imgVisual.onload = resolve;
-          imgVisual.onerror = function () { reject(new Error('Failed to load visual image')); };
-        })
-      ]).then(function () {
-        loadingEl.style.display = 'none';
-        errorEl.style.display = 'none';
-        switchMode('sidebyside');
-      }).catch(function (err) {
-        showError(err.message + ' — Ensure the report is in the same folder as ' + thermalUrl + ' and ' + visualUrl + ', or use ?stem=XXX');
-      });
-
-      modeBtns.forEach(function (btn) {
-        btn.addEventListener('click', function () {
-          switchMode(btn.getAttribute('data-mode'));
+        const thermalLayers = [];
+        stems.forEach(function (stem) {
+          const { section, ovThermal } = buildSection(stem);
+          contentEl.appendChild(section);
+          thermalLayers.push(ovThermal);
         });
-      });
 
-      var alphaSlider = document.getElementById('alpha');
-      var alphaValue = document.getElementById('alpha-value');
-      alphaSlider.addEventListener('input', function () {
-        var pct = alphaSlider.value;
-        overlayThermal.style.opacity = pct / 100;
-        alphaValue.textContent = pct + '%';
+        const loadPromises = stems.map(function (stem) {
+          const thermalUrl = stem + '_thermal_320x240.bmp';
+          const visualUrl = stem + '_visual_640x480.bmp';
+          return Promise.all([
+            new Promise(function (resolve, reject) {
+              const img = new Image();
+              img.onload = resolve;
+              img.onerror = function () { reject(new Error('Failed to load ' + thermalUrl)); };
+              img.src = thermalUrl;
+            }),
+            new Promise(function (resolve, reject) {
+              const img = new Image();
+              img.onload = resolve;
+              img.onerror = function () { reject(new Error('Failed to load ' + visualUrl)); };
+              img.src = visualUrl;
+            })
+          ]);
+        });
+
+        Promise.all(loadPromises).then(function () {
+          loadingEl.style.display = 'none';
+          errorEl.style.display = 'none';
+          switchMode('sidebyside');
+        }).catch(function (err) {
+          showError(err.message + ' — Open the report from the folder that contains the extracted BMPs (and optionally stems.json).');
+        });
+
+        document.querySelectorAll('.mode-btn').forEach(function (btn) {
+          btn.addEventListener('click', function () {
+            switchMode(btn.getAttribute('data-mode'));
+          });
+        });
+
+        const alphaSlider = document.getElementById('alpha');
+        const alphaValue = document.getElementById('alpha-value');
+        function setOverlayOpacity(pct) {
+          thermalLayers.forEach(function (el) { el.style.opacity = pct / 100; });
+          alphaValue.textContent = pct + '%';
+        }
+        alphaSlider.addEventListener('input', function () {
+          setOverlayOpacity(parseInt(alphaSlider.value, 10));
+        });
+        setOverlayOpacity(parseInt(alphaSlider.value, 10));
+      }).catch(function (err) {
+        showError(err.message);
       });
-      overlayThermal.style.opacity = alphaSlider.value / 100;
     })();
   </script>
 </body>

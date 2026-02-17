@@ -189,28 +189,61 @@ def extract_images(bmt_path: Path, out_dir: Path) -> None:
         print(f"  {label}: {width}x{height} -> {out_path}")
 
 
-def write_report(out_dir: Path, stem: str) -> None:
-    """Write HTML report into out_dir as {stem}_report.html (uses images in same folder)."""
+def write_report(out_dir: Path, stems: list[str]) -> None:
+    """Write HTML report into out_dir. Single stem -> {stem}_report.html; multiple -> report.html."""
     template = Path(__file__).parent / "bmt_report.html"
     if not template.exists():
         return
-    report_path = out_dir / f"{stem}_report.html"
-    report_path.write_bytes(template.read_bytes())
+    html = template.read_text()
+    if len(stems) == 1:
+        report_path = out_dir / f"{stems[0]}_report.html"
+    else:
+        report_path = out_dir / "report.html"
+        # Embed stems so report can show all without fetching (stems.json still written for consistency)
+        import json
+        html = html.replace(
+            "/* __STEMS_JSON__ */ null",
+            "/* __STEMS_JSON__ */ " + json.dumps(stems),
+        )
+    report_path.write_text(html)
     print(f"  Report: {report_path}")
 
 
 def main() -> None:
-    bmt_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("IV_01279.BMT")
-    out_dir = Path(sys.argv[2]) if len(sys.argv) > 2 else bmt_path.parent / "extracted"
+    input_path = Path(sys.argv[1]) if len(sys.argv) > 1 else Path("IV_01279.BMT")
+    out_dir_arg = Path(sys.argv[2]) if len(sys.argv) > 2 else None
 
-    if not bmt_path.exists():
-        print(f"File not found: {bmt_path}", file=sys.stderr)
+    if not input_path.exists():
+        print(f"Not found: {input_path}", file=sys.stderr)
         sys.exit(1)
 
-    print(f"Input: {bmt_path}")
-    print(f"Output dir: {out_dir}")
-    extract_images(bmt_path, out_dir)
-    write_report(out_dir, bmt_path.stem)
+    if input_path.is_dir():
+        out_dir = out_dir_arg or input_path / "extracted"
+        out_dir.mkdir(parents=True, exist_ok=True)
+        bmt_files = sorted(
+            (p for p in input_path.iterdir() if p.suffix.upper() == ".BMT" and p.is_file()),
+            key=lambda p: p.name.lower(),
+        )
+        if not bmt_files:
+            print(f"No .BMT files in {input_path}", file=sys.stderr)
+            sys.exit(1)
+        print(f"Input dir: {input_path} ({len(bmt_files)} files)")
+        print(f"Output dir: {out_dir}")
+        stems = []
+        for bmt_path in bmt_files:
+            extract_images(bmt_path, out_dir)
+            stems.append(bmt_path.stem)
+        (out_dir / "stems.json").write_text(
+            __import__("json").dumps(stems, indent=2),
+            encoding="utf-8",
+        )
+        write_report(out_dir, stems)
+    else:
+        out_dir = out_dir_arg or input_path.parent / "extracted"
+        print(f"Input: {input_path}")
+        print(f"Output dir: {out_dir}")
+        extract_images(input_path, out_dir)
+        write_report(out_dir, [input_path.stem])
 
 
 if __name__ == "__main__":
