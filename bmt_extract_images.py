@@ -13,13 +13,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """
-Extract the three potential images from a Testo BMT file and save as BMP.
+Extract thermal and visual images from a Testo BMT file and save as BMP.
 
 Based on reverse-engineered layout:
-- Image 1 (320x240): 36-byte header, then 16-bit LE pixel data (thermal/SuperResolution).
-- Image 2 (640x480): same 36-byte header at 153740, then 16-bit LE pixel data (visual).
-- Image 3 (160x120): 160,120 found at 768293 (16-bit LE); data assumed to start
-  immediately after the 4-byte dimension (768297) — no standard header in context.
+- Image 1 (320x240): 54-byte header, then 16-bit LE pixel data (thermal/SuperResolution).
+- Image 2 (640x480): 36-byte header at 153740, then 16-bit LE pixel data (visual).
 
 Thermal images: min-max normalized, then applied to a temperature colormap (dark blue →
 blue → yellow → red → whitish red) and saved as 24-bit BMP. Visual: high byte only (no
@@ -30,17 +28,17 @@ import struct
 import sys
 from pathlib import Path
 
-# Header size used for first two images (BMP-like block header)
-BMT_HEADER_SIZE = 36
-
-# (label, file_offset, width, height, data_offset_override, "thermal" | "visual")
-# Visual: header at 153740 + 36
+# First block: thermal 320x240 after 54-byte header
+THERMAL_HEADER_SIZE = 54
+# Second block: visual 640x480 at 153740, 36-byte header
 VISUAL_HEADER_OFFSET = 153740
+VISUAL_HEADER_SIZE = 36
 
+# (label, header_offset, width, height, data_offset_override, "thermal" | "visual")
+# data_offset_override: if set, use it; else data_offset = header_offset + header size
 IMAGE_SPECS = [
-    ("thermal_320x240", 0, 320, 240, None, "thermal"),
-    ("visual_640x480", VISUAL_HEADER_OFFSET, 640, 480, VISUAL_HEADER_OFFSET + BMT_HEADER_SIZE, "visual"),
-    ("thermal_160x120", 768293, 160, 120, 768297, "thermal"),
+    ("thermal_320x240", 0, 320, 240, THERMAL_HEADER_SIZE, "thermal"),
+    ("visual_640x480", VISUAL_HEADER_OFFSET, 640, 480, VISUAL_HEADER_OFFSET + VISUAL_HEADER_SIZE, "visual"),
 ]
 
 
@@ -179,7 +177,8 @@ def extract_images(bmt_path: Path, out_dir: Path) -> None:
         if data_offset_override is not None:
             data_offset = data_offset_override
         else:
-            data_offset = header_offset + BMT_HEADER_SIZE
+            header_size = THERMAL_HEADER_SIZE if header_offset == 0 else VISUAL_HEADER_SIZE
+            data_offset = header_offset + header_size
 
         pixel_bytes = width * height * 2
         end = data_offset + pixel_bytes

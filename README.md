@@ -28,7 +28,7 @@ This project was tried without the SuperResolution option turned on. This option
 python3 bmt_extract_images.py path/to/image.BMT
 ```
 
-Output goes to `path/to/extracted/` by default (e.g. `image_thermal_320x240.bmp`, `image_visual_640x480.bmp`, `image_thermal_160x120.bmp`, and `image_report.html`).
+Output goes to `path/to/extracted/` by default (e.g. `image_thermal_320x240.bmp`, `image_visual_640x480.bmp`, and `image_report.html`).
 
 **Directory of BMT files:**
 
@@ -68,8 +68,8 @@ Prints a hex dump of the header and all candidate offsets where known resolution
 
 ## File layout (reverse‑engineered)
 
-- **BMA header** (36 bytes) then 320×240 16‑bit thermal pixels.
-- Second block: same 36‑byte header at offset 153740, then 640×480 16‑bit visual pixels.
+- **First block:** BMA header (54 bytes) then 320×240 16‑bit thermal pixels.
+- **Second block:** 36‑byte header at offset 153740, then 640×480 16‑bit visual pixels.
 - Thermal images are normalized and saved with a temperature colormap (dark blue → blue → yellow → red → white). Visual uses the high byte of each 16‑bit value (no normalisation). All images are rotated 180° to correct orientation.
 
 ## License

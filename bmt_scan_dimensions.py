@@ -86,7 +86,7 @@ def dump_header(data: bytes, length: int = 64) -> None:
         u16_le = lambda i: struct.unpack_from("<H", data, i)[0]
         print(f"  @ 0x04  u32 LE: {u32_le(4)}")
         print(f"  @ 0x08  u32 LE: {u32_le(8)}")
-        print(f"  @ 0x0A  u32 LE: {u32_le(10)}  (header size, often 36)")
+        print(f"  @ 0x0A  u32 LE: {u32_le(10)}  (header size)")
         print(f"  @ 0x0E  u32 LE: {u32_le(14)}  (sub-header size? = 40)")
         print(f"  @ 0x12  u32 LE: {u32_le(18)}  <- width")
         print(f"  @ 0x16  u32 LE: {u32_le(22)}  <- height")
