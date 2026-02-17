@@ -24,7 +24,6 @@ BMT_HEADER_SIZE = 54
 IMAGE_SPECS = [
     ("thermal_320x240", 0, 320, 240, None, "thermal"),
     ("visual_640x480", 153740, 640, 480, None, "visual"),
-    ("thermal_160x120", 768293, 160, 120, 768297, "thermal"),
 ]
 
 
@@ -53,12 +52,6 @@ def raw_16bit_to_grayscale_normalized(data: bytes, width: int, height: int) -> b
     if mx <= mn:
         mx = mn + 1
     return bytes((int((p - mn) * 255 / (mx - mn)) for p in pixels_16))
-
-
-def raw_16bit_to_grayscale_linear(data: bytes, width: int, height: int) -> bytes:
-    """16-bit LE -> 8-bit using high byte only, no normalisation (for visual)."""
-    pixels_16 = _read_16bit_le_pixels(data, width, height)
-    return bytes((min(255, p >> 8) for p in pixels_16))
 
 
 # Temperature colormap: cold (0) = dark blue → blue → yellow → red → whitish red (255)
@@ -182,10 +175,7 @@ def extract_images(bmt_path: Path, out_dir: Path) -> None:
             continue
 
         raw = data[data_offset:end]
-        if kind == "visual":
-            pixels_8 = raw_16bit_to_grayscale_linear(raw, width, height)
-        else:
-            pixels_8 = raw_16bit_to_grayscale_normalized(raw, width, height)
+        pixels_8 = raw_16bit_to_grayscale_normalized(raw, width, height)
 
         pixels_8 = flip_180(pixels_8, width, height)
 
