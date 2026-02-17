@@ -17,11 +17,11 @@ Extract thermal and visual images from a Testo BMT file and save as BMP.
 
 Based on reverse-engineered layout:
 - Image 1 (320x240): 54-byte header, then 16-bit LE pixel data (thermal/SuperResolution).
-- Image 2 (640x480): 36-byte header at 153740, then 16-bit LE pixel data (visual).
+- Image 2 (640x480): embedded as a complete BMP starting at 0x2587a (magic "BM", size in header).
 
 Thermal images: min-max normalized, then applied to a temperature colormap (dark blue →
-blue → yellow → red → whitish red) and saved as 24-bit BMP. Visual: high byte only (no
-normalisation), 8-bit grayscale BMP. All images are rotated 180° to correct orientation.
+blue → yellow → red → whitish red) and saved as 24-bit BMP. Visual: the embedded BMP is
+extracted verbatim (no conversion, no rotation).
 """
 
 import struct
@@ -30,15 +30,13 @@ from pathlib import Path
 
 # First block: thermal 320x240 after 54-byte header
 THERMAL_HEADER_SIZE = 54
-# Second block: visual 640x480 at 153740, 36-byte header
-VISUAL_HEADER_OFFSET = 153740
-VISUAL_HEADER_SIZE = 36
+# Visual: embedded BMP starts here (magic "BM"; file size at offset +2, 4 bytes LE)
+VISUAL_BMP_OFFSET = 0x2587A
 
 # (label, header_offset, width, height, data_offset_override, "thermal" | "visual")
-# data_offset_override: if set, use it; else data_offset = header_offset + header size
 IMAGE_SPECS = [
     ("thermal_320x240", 0, 320, 240, THERMAL_HEADER_SIZE, "thermal"),
-    ("visual_640x480", VISUAL_HEADER_OFFSET, 640, 480, VISUAL_HEADER_OFFSET + VISUAL_HEADER_SIZE, "visual"),
+    ("visual_640x480", None, 640, 480, None, "visual"),
 ]
 
 
@@ -174,12 +172,33 @@ def extract_images(bmt_path: Path, out_dir: Path) -> None:
 
     for spec in IMAGE_SPECS:
         label, header_offset, width, height, data_offset_override, kind = spec
-        if data_offset_override is not None:
-            data_offset = data_offset_override
-        else:
-            header_size = THERMAL_HEADER_SIZE if header_offset == 0 else VISUAL_HEADER_SIZE
-            data_offset = header_offset + header_size
+        out_name = f"{bmt_path.stem}_{label}.bmp"
+        out_path = out_dir / out_name
 
+        if kind == "visual":
+            # Visual image is an embedded BMP: extract verbatim
+            if data[VISUAL_BMP_OFFSET : VISUAL_BMP_OFFSET + 2] != b"BM":
+                print(
+                    f"  {label}: skip (no BMP magic at 0x{VISUAL_BMP_OFFSET:x})",
+                    file=sys.stderr,
+                )
+                continue
+            bmp_size = struct.unpack_from("<I", data, VISUAL_BMP_OFFSET + 2)[0]
+            end = VISUAL_BMP_OFFSET + bmp_size
+            if end > len(data):
+                print(
+                    f"  {label}: skip (BMP size {bmp_size} extends past file)",
+                    file=sys.stderr,
+                )
+                continue
+            out_path.write_bytes(data[VISUAL_BMP_OFFSET:end])
+            print(f"  {label}: {width}x{height} (embedded BMP, {bmp_size} bytes) -> {out_path}")
+            continue
+
+        # Thermal: raw 16-bit pixels after header
+        data_offset = data_offset_override
+        if data_offset is None:
+            data_offset = header_offset + THERMAL_HEADER_SIZE
         pixel_bytes = width * height * 2
         end = data_offset + pixel_bytes
 
@@ -192,16 +211,9 @@ def extract_images(bmt_path: Path, out_dir: Path) -> None:
 
         raw = data[data_offset:end]
         pixels_8 = raw_16bit_to_grayscale_normalized(raw, width, height)
-
         pixels_8 = flip_180(pixels_8, width, height)
-
-        out_name = f"{bmt_path.stem}_{label}.bmp"
-        out_path = out_dir / out_name
-        if kind == "thermal":
-            bgr = thermal_index_to_rgb(pixels_8)
-            write_bmp_24bit(out_path, width, height, bgr)
-        else:
-            write_bmp_8bit(out_path, width, height, pixels_8)
+        bgr = thermal_index_to_rgb(pixels_8)
+        write_bmp_24bit(out_path, width, height, bgr)
         print(f"  {label}: {width}x{height} -> {out_path}")
 
 

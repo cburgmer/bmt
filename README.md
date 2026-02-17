@@ -89,7 +89,7 @@ Reports four ranges (file/thermal header, block between thermal and visual, visu
 ## File layout (reverse‑engineered)
 
 - **First block:** BMA header (54 bytes) then 320×240 16‑bit thermal pixels.
-- **Second block:** 36‑byte header at offset 153740, then 640×480 16‑bit visual pixels.
+- **Second block:** Visual image stored as an embedded BMP starting at 0x2587a (magic "BM"; size in header). Extracted verbatim.
 - Thermal images are normalized and saved with a temperature colormap (dark blue → blue → yellow → red → white). Visual uses the high byte of each 16‑bit value (no normalisation). All images are rotated 180° to correct orientation.
 
 ## License
