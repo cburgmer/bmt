@@ -137,7 +137,11 @@
       font-size: 0.85rem;
       color: #999;
     }
-    .img-wrap.thermal-wrap, .overlay-wrap {
+    .sidebyside-view .thermal-img-container {
+      position: relative;
+      display: block;
+    }
+    .overlay-wrap {
       position: relative;
     }
     .crosshair-overlay {
@@ -302,8 +306,10 @@
         section.innerHTML =
           '<h2>' + stem + (tempRangeStr ? ' <span class="temp-range">(' + tempRangeStr + ')</span>' : '') + '</h2>' +
           '<div class="sidebyside-view">' +
-            '<div class="img-wrap thermal-wrap">' +
-              '<img class="sb-thermal" alt="Thermal" />' + crosshairHtml +
+            '<div class="img-wrap">' +
+              '<div class="thermal-img-container">' +
+                '<img class="sb-thermal" alt="Thermal" />' + crosshairHtml +
+              '</div>' +
               '<span class="caption">Thermal (320×240)</span></div>' +
             '<div class="img-wrap"><img class="sb-visual" alt="Visual" /><span class="caption">Visual (640×480)</span></div>' +
           '</div>' +
