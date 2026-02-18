@@ -193,6 +193,15 @@
       border-radius: 8px;
       box-shadow: 0 2px 12px rgba(0,0,0,0.4);
     }
+    .overlay-wrap .thermal-overlay-group {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      transform-origin: 50% 50%;
+    }
     .overlay-wrap .thermal-layer {
       position: absolute;
       left: 0;
@@ -203,7 +212,6 @@
       pointer-events: none;
       border-radius: 8px;
       transition: opacity 0.15s ease;
-      transform-origin: 50% 50%;
     }
     .error {
       color: #f66;
@@ -302,8 +310,10 @@
           '<div class="overlay-view">' +
             '<div class="overlay-wrap">' +
               '<img class="base ov-visual" alt="Visual" />' +
-              '<img class="thermal-layer ov-thermal" alt="Thermal overlay" />' +
-              crosshairHtml +
+              '<div class="thermal-overlay-group">' +
+                '<img class="thermal-layer ov-thermal" alt="Thermal overlay" />' +
+                crosshairHtml +
+              '</div>' +
             '</div>' +
           '</div>';
 
@@ -332,10 +342,13 @@
           : 'BMT: ' + stems[0] + ' — Thermal + visual';
 
         const thermalLayers = [];
+        const thermalGroups = [];
         stems.forEach(function (stem) {
           const { section, ovThermal } = buildSection(stem);
           contentEl.appendChild(section);
           thermalLayers.push(ovThermal);
+          const group = section.querySelector('.thermal-overlay-group');
+          if (group) thermalGroups.push(group);
         });
 
         const loadPromises = stems.map(function (stem) {
@@ -398,7 +411,7 @@
           const ox = getOffsetX();
           const oy = getOffsetY();
           const t = 'translate(' + ox + 'px,' + oy + 'px) scale(' + scale + ')';
-          thermalLayers.forEach(function (el) { el.style.transform = t; });
+          thermalGroups.forEach(function (el) { el.style.transform = t; });
           scaleValue.textContent = scale.toFixed(2);
           offsetXValue.textContent = ox;
           offsetYValue.textContent = oy;
